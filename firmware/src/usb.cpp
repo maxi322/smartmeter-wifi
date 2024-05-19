@@ -12,7 +12,7 @@
 
 #define USB_HOST_PRIORITY   20
 #define USB_DEVICE_VID      0x0403
-#define USB_DEVICE_PID      0x6001
+#define USB_DEVICE_PID      0x6015
 
 /* FTD232 */
 #define FT_SIO_SET_BAUDRATE_REQUEST_TYPE    0x40
