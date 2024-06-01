@@ -2,7 +2,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
-#include <SPIFFS.h>
+#include <mpspiffs.hpp>
 
 #include <espMqttClient.h>
 
@@ -195,6 +195,26 @@ static bool UsbRx(const uint8_t *data, size_t dataLen, void *arg)
     return ret;
 }
 
+void mountspiffs( const char * partition) {
+    Serial.printf("Mounting %s... ", partition);
+    if(Spiffs.begin(partition, true)) {
+        Serial.println("success.");
+    }
+    else {
+        Serial.println("failed.");
+    }
+}
+
+void unmountspiffs() {
+    Serial.printf("Unmounting %s... ", Spiffs.mountedPartition());
+    if (Spiffs.end()) {
+        Serial.println("success.");
+    }
+    else {
+        Serial.println("failed.");
+    }
+}
+
 // Read File from SPIFFS
 static String readFile(fs::FS &fs, const char * path) {
   
@@ -219,6 +239,9 @@ static String readFile(fs::FS &fs, const char * path) {
 // Write file to SPIFFS
 static void writeFile(fs::FS &fs, const char *path, const char *message) {
 
+    unmountspiffs();
+    mountspiffs("varfs");
+
     Serial.printf("Writing file: %s\r\n", path);
 
     File file = fs.open(path, FILE_WRITE);
@@ -233,6 +256,8 @@ static void writeFile(fs::FS &fs, const char *path, const char *message) {
         Serial.println("- write failed");
     }
     file.close();
+    unmountspiffs();
+    mountspiffs("mainfs");
 }
 
 
@@ -358,7 +383,7 @@ static void RouteWebpages(void) {
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (ON_STA_FILTER(request)) {
-            request->send(SPIFFS, "/index.html", "text/html", false, processor);
+            request->send(Spiffs, "/index.html", "text/html", false, processor);
         } else if (ON_AP_FILTER(request)) {
             request->send(200, "text/html", wlan_html);
         }
@@ -373,11 +398,11 @@ static void RouteWebpages(void) {
                     if (p->name() == "ssid") {
                         String str = p->value();
                         Serial.printf("SSID set to: %s\r\n", str.c_str());
-                        writeFile(SPIFFS, ssidPath, str.c_str());
+                        writeFile(Spiffs, ssidPath, str.c_str());
                     } else if (p->name() == "pass") {
                         String str = p->value();
                         Serial.printf("Password set to: %s\r\n", str.c_str());
-                        writeFile(SPIFFS, passPath, str.c_str());
+                        writeFile(Spiffs, passPath, str.c_str());
                     }
                 }
             }
@@ -401,7 +426,7 @@ static void RouteWebpages(void) {
                     String str = p->value();
                     Serial.printf("AES-Key set to: %s\r\n", str.c_str());
                     // Write file to save value
-                    writeFile(SPIFFS, aeskeyPath, str.c_str());
+                    writeFile(Spiffs, aeskeyPath, str.c_str());
                 }
             }
             request->send(200, "text/plain", "Done. ESP will restart...");
@@ -426,27 +451,27 @@ static void RouteWebpages(void) {
                         String str = p->value();
                         Serial.printf("mqtt broker set to: %s\r\n", str.c_str());
                         // Write file to save value
-                        writeFile(SPIFFS, mqttbrokerPath, str.c_str());
+                        writeFile(Spiffs, mqttbrokerPath, str.c_str());
                     } else if (p->name() == "mqtt-port") {
                         String str = p->value();
                         Serial.printf("mqtt broker port set to: %s\r\n", str.c_str());
                         // Write file to save value
-                        writeFile(SPIFFS, mqttportPath, str.c_str());
+                        writeFile(Spiffs, mqttportPath, str.c_str());
                     } else if (p->name() == "mqtt-topic") {
                         String str = p->value();
                         Serial.printf("mqtt topic set to: %s\r\n", str.c_str());
                         // Write file to save value
-                        writeFile(SPIFFS, mqtttopicPath, str.c_str());
+                        writeFile(Spiffs, mqtttopicPath, str.c_str());
                     } else if (p->name() == "mqtt-user") {
                         String str = p->value();
                         Serial.printf("mqtt user set to: %s\r\n", str.c_str());
                         // Write file to save value
-                        writeFile(SPIFFS, mqttuserPath, str.c_str());
+                        writeFile(Spiffs, mqttuserPath, str.c_str());
                     } else if (p->name() == "mqtt-password") {
                         String str = p->value();
                         Serial.printf("mqtt password set to: %s\r\n", str.c_str());
                         // Write file to save value
-                        writeFile(SPIFFS, mqttpasswordPath, str.c_str());
+                        writeFile(Spiffs, mqttpasswordPath, str.c_str());
                     }
                 }
             }
@@ -469,11 +494,11 @@ static void RouteWebpages(void) {
                     if (p->name() == "ssid") {
                         String str = p->value();
                         Serial.printf("SSID set to: %s\r\n", str.c_str());
-                        writeFile(SPIFFS, ssidPath, str.c_str());
+                        writeFile(Spiffs, ssidPath, str.c_str());
                     } else if (p->name() == "pass") {
                         String str = p->value();
                         Serial.printf("Password set to: %s\r\n", str.c_str());
-                        writeFile(SPIFFS, passPath, str.c_str());
+                        writeFile(Spiffs, passPath, str.c_str());
                     }
                 }
             }
@@ -517,7 +542,7 @@ static void RouteWebpages(void) {
 
 static void SetupHtml(void) {
 
-    wlan_html = readFile(SPIFFS, "/wifimanager.html");
+    wlan_html = readFile(Spiffs, "/wifimanager.html");
     if (!ssid.isEmpty()) {
         String str("value=\"");
         str.concat(ssid);
@@ -530,7 +555,7 @@ static void SetupHtml(void) {
         str.concat("\"");
         wlan_html.replace("value=\"pass\"", str);
     }
-    smartmeter_html = readFile(SPIFFS, "/smartmeter.html");
+    smartmeter_html = readFile(Spiffs, "/smartmeter.html");
     if (!aeskey.isEmpty()) {
         String str("value=\"");
         str.concat(aeskey);
@@ -538,7 +563,7 @@ static void SetupHtml(void) {
         smartmeter_html.replace("value=\"00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff\"", str);
     }
 
-    mqtt_html = readFile(SPIFFS, "/mqtt.html");
+    mqtt_html = readFile(Spiffs, "/mqtt.html");
     if (!mqttbroker.isEmpty()) {
         String str("value=\"");
         str.concat(mqttbroker);
@@ -579,23 +604,20 @@ void setup() {
     ledState = 1;
 
     Serial.begin(115200);
-
-    if (!SPIFFS.begin(true)) {
-       Serial.println("SPIFFS error");
-    }
+    mountspiffs("varfs");
 
     // Load values saved in SPIFFS
-    ssid = readFile(SPIFFS, ssidPath);
-    pass = readFile(SPIFFS, passPath);
-    aeskey = readFile(SPIFFS, aeskeyPath);
-    mqttbroker = readFile(SPIFFS, mqttbrokerPath);
-    String port = readFile(SPIFFS, mqttportPath);
+    ssid = readFile(Spiffs, ssidPath);
+    pass = readFile(Spiffs, passPath);
+    aeskey = readFile(Spiffs, aeskeyPath);
+    mqttbroker = readFile(Spiffs, mqttbrokerPath);
+    String port = readFile(Spiffs, mqttportPath);
     if (port) {
         mqttport = strtol(port.c_str(), 0, 10);
     }
-    mqtttopic = readFile(SPIFFS, mqtttopicPath);
-    mqttuser = readFile(SPIFFS, mqttuserPath);
-    mqttpassword = readFile(SPIFFS, mqttpasswordPath);
+    mqtttopic = readFile(Spiffs, mqtttopicPath);
+    mqttuser = readFile(Spiffs, mqttuserPath);
+    mqttpassword = readFile(Spiffs, mqttpasswordPath);
 
     Serial.printf("\r\nConfiguration:\r\n");
     Serial.printf("ssid: %s\r\n", ssid.c_str());
@@ -605,6 +627,9 @@ void setup() {
     Serial.printf("mqttport: %d\r\n", mqttport);
     Serial.printf("mqtttopic: %s\r\n\r\n", mqtttopic.c_str());
 
+    unmountspiffs();
+    mountspiffs("mainfs");
+
     Set_key(aeskey);
 
     InitWiFi();
@@ -612,7 +637,8 @@ void setup() {
     SetupHtml();
     RouteWebpages();
 
-    server.serveStatic("/", SPIFFS, "/");
+
+    server.serveStatic("/", Spiffs, "/");
 
     if (!mqttbroker.isEmpty() && mqttport && !mqtttopic.isEmpty()) {
         mqttClient.setCredentials(mqttuser.c_str(), mqttpassword.c_str());
