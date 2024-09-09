@@ -1,0 +1,47 @@
+name: PlatformIO CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Install tool-mkspiffs
+        run: |
+            pio pkg install --global --tool "platformio/tool-mkspiffs@^2.230.0"
+
+      - name: Build Firmware
+        run: |
+            cd firmware
+            pio run
+            mkdir bin
+            mv .pio/build/smif/firmware.bin bin/smif-ESP32-S3.bin
+            mv .pio/build/saola/firmware.bin bin/smif-ESP32-S2.bin
+
+      - name: Build Filesystem
+        run: |
+            cd firmware
+            mkdir emptyffs
+            $HOME/.platformio/packages/tool-mkspiffs/mkspiffs_espressif32_arduino -c $PWD/emptyffs/ -s 0x20000 $PWD/bin/varfs.bin
+            $HOME/.platformio/packages/tool-mkspiffs/mkspiffs_espressif32_arduino -c $PWD/data/ -s 0x20000 $PWD/bin/mainfs.bin
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Firmware-Filesystem
+          path: firmware/bin
